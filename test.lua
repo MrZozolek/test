@@ -1,63 +1,56 @@
+--[[ Universal ESP for Solar/Executors (players: green = visible, red = invisible) ]]--
+
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
-function isVisible(target)
-    local character = LocalPlayer.Character
-    local targetCharacter = target.Character
-    if not character or not targetCharacter then return false end
-
-    local head = character:FindFirstChild("Head")
-    local targetHead = targetCharacter:FindFirstChild("Head")
+local function isVisible(target)
+    if not LocalPlayer.Character or not target.Character then return false end
+    local head = LocalPlayer.Character:FindFirstChild("Head")
+    local targetHead = target.Character:FindFirstChild("Head")
     if not head or not targetHead then return false end
-
-    -- Raycast od własnej głowy do głowy celu
-    local ray = Ray.new(head.Position, (targetHead.Position - head.Position).unit * (targetHead.Position - head.Position).magnitude)
-    local hitPart, hitPosition = workspace:FindPartOnRay(ray, character)
-
-    -- Jeśli promień dotarł do celu bez przeszkód, gracz jest widoczny
-    if hitPart and hitPart:IsDescendantOf(targetCharacter) then
-        return true
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character, Workspace.Camera}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = Workspace:Raycast(head.Position, (targetHead.Position - head.Position).Unit * (targetHead.Position - head.Position).Magnitude, params)
+    if result and result.Instance and not result.Instance:IsDescendantOf(target.Character) then
+        return false
     end
-    return false
+    return true
 end
 
-function addHighlight(player, color)
-    local character = player.Character
+local function highlightPlayer(plr, col)
+    local character = plr.Character
     if not character then return end
-    if character:FindFirstChild("ESPHighlight") then return end
-
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESPHighlight"
-    highlight.Adornee = character
-    highlight.FillColor = color
-    highlight.OutlineColor = color
-    highlight.Parent = character
+    local h = character:FindFirstChild("SolarESP") or Instance.new("Highlight")
+    h.Name = "SolarESP"
+    h.Adornee = character
+    h.FillColor = col
+    h.OutlineColor = col
+    h.OutlineTransparency = 0
+    h.Parent = character
 end
 
-function removeHighlight(player)
-    local character = player.Character
-    if not character then return end
-    local highlight = character:FindFirstChild("ESPHighlight")
-    if highlight then
-        highlight:Destroy()
+local function removeHighlight(plr)
+    local character = plr.Character
+    if character then
+        local h = character:FindFirstChild("SolarESP")
+        if h then h:Destroy() end
     end
 end
 
-function updateHighlights()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            removeHighlight(player)
-            if isVisible(player) then
-                addHighlight(player, Color3.fromRGB(0,255,0)) -- Zielony
-            else
-                addHighlight(player, Color3.fromRGB(255,0,0)) -- Czerwony
+while true do
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            removeHighlight(plr)
+            if plr.Character and plr.Character:FindFirstChild("Head") then
+                if isVisible(plr) then
+                    highlightPlayer(plr, Color3.fromRGB(0,255,0))
+                else
+                    highlightPlayer(plr, Color3.fromRGB(255,0,0))
+                end
             end
         end
     end
-end
-
--- Co sekundę aktualizuj kolory ESP
-while true do
-    pcall(updateHighlights)
-    wait(1)
+    task.wait(1)
 end
